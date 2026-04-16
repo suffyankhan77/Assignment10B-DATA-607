@@ -1,0 +1,137 @@
+---
+title: "Assignment 10B – Approach"
+author: "Muhammad Suffyan Khan"
+format: html
+editor: visual
+date: "04/15/2026"
+---
+
+## Objective
+
+The objective of this assignment is to use the public Nobel Prize API data provided by NobelPrize.org in JSON format, retrieve the data in R, transform the nested JSON into tidy data frames, and answer four interesting data-driven questions based on the Nobel Prize dataset.
+
+This assignment will demonstrate the ability to work with JSON data from an API, flatten and tidy nested structures, and perform exploratory analysis using tidyverse tools in R. In addition to answering straightforward summary questions, at least one of the questions will go beyond simple counts by requiring filtering, comparison, and field-level analysis across laureate and prize information.
+
+The final result will be a single reproducible Quarto document that includes the four questions, all code used to retrieve and process the JSON data, and the resulting answers in the form of tables, summaries, and visualizations.
+
+------------------------------------------------------------------------
+
+## Selected Data Source
+
+For this assignment, I will use the official **Nobel Prize API** made available through the Nobel Prize Developer Zone.
+
+The two main API endpoints that will be used where appropriate:
+
+-   `https://api.nobelprize.org/2.1/nobelPrizes`
+-   `https://api.nobelprize.org/2.1/laureates`
+
+These endpoints return Nobel Prize data in JSON format, including information about prize categories, award years, laureates, birth information, affiliations, and award motivations.
+
+API Documentation: https://www.nobelprize.org/about/developer-zone-2/
+
+Since this assignment requires JSON processing in R, the analysis will directly retrieve the API responses in JSON format rather than relying on manually downloaded files. This supports reproducibility because the data retrieval and transformation steps will be included directly in the Quarto document.
+
+------------------------------------------------------------------------
+
+## Planned Questions
+
+The following four questions will guide the analysis:
+
+### Question 1
+
+**Which Nobel Prize categories have been awarded most frequently?**
+
+This question will provide a category-level summary of Nobel Prize awards and serve as an introductory overview of the dataset.
+
+### Question 2
+
+**Which decades have had the highest number of Nobel Prize awards or laureates?**
+
+This question will examine how Nobel Prize activity has varied over time by grouping awards into decades.
+
+### Question 3
+
+**Which birth countries have produced the highest number of Nobel laureates?**
+
+This question will use laureate-level information to identify which countries are most frequently represented as places of birth among Nobel laureates.
+
+### Question 4
+
+**Which countries appear to lose the most Nobel laureates, meaning laureates born in one country but affiliated with or awarded through another country?**
+
+This question goes beyond simple counts and will require comparing multiple country-related fields from the laureate data. It is intended to satisfy the assignment requirement that at least one question involve more than a basic frequency count by using filtering and cross-field comparison.
+
+------------------------------------------------------------------------
+
+## Planned Workflow
+
+The workflow for this assignment will be:
+
+1.  Load required libraries such as `httr2` or `jsonlite`, along with tidyverse packages including `dplyr`, `tidyr`, `purrr`, `stringr`, and `ggplot2`
+2.  Retrieve JSON data from one or both Nobel Prize API endpoints
+3.  Parse the JSON responses into R lists
+4.  Inspect the JSON structure to identify the main nested fields relevant to prizes, laureates, years, categories, countries, and affiliations
+5.  Extract and flatten the nested components into tidy tibbles
+6.  Standardize column names and retain only the variables needed for analysis
+7.  Convert year fields to numeric values where needed and derive additional variables such as decade
+8.  Clean country-related fields so they can be grouped and compared consistently
+9.  Create separate tidy data frames if necessary for:
+    -   prize-level data
+    -   laureate-level data
+    -   affiliation or award-related country data
+10. Join or compare data frames where needed to answer the more analytical question(s)
+11. Produce tables, summaries, and visualizations for each of the four questions
+12. Include short interpretations of each result directly in the Quarto report
+
+------------------------------------------------------------------------
+
+## Planned Data Preparation
+
+Because the Nobel Prize API returns nested JSON, one of the main preparation tasks will be converting hierarchical API output into tidy rectangular data frames.
+
+Several data preparation steps are expected:
+
+-   Nested laureate and prize information may need to be unnested into separate rows
+-   Country information may appear in different fields and may require extraction from nested objects
+-   Some laureates or prizes may have missing metadata, such as absent birth locations, affiliations, or organization-related fields
+-   Category and year fields may need to be standardized for consistent grouping and plotting
+-   In some cases, institutions and individuals may appear differently in the raw data, so only relevant fields will be retained depending on the question being answered
+
+To keep the analysis tidy and interpretable, only variables directly relevant to the four questions will be preserved in the final analytical tables.
+
+------------------------------------------------------------------------
+
+## Validation and Quality Checks
+
+To strengthen the reliability of the analysis, I will include basic validation checks during data preparation.
+
+These checks may include:
+
+-   verifying that the API request returns data successfully
+-   checking the structure of the parsed JSON objects
+-   confirming that key columns such as year, category, and laureate identifiers are present after transformation
+-   inspecting missing values in important fields such as birth country or affiliation country
+-   checking row counts before and after unnesting to ensure the transformation behaves as expected
+-   reviewing distinct category names and year ranges for consistency
+
+These checks will help ensure that the tidy data frames accurately reflect the original JSON data and that the final answers are based on valid transformations.
+
+------------------------------------------------------------------------
+
+## Anticipated Challenges
+
+One expected challenge is that the Nobel Prize API data is nested and may represent people, organizations, prizes, and affiliations in slightly different ways. This means some fields may not be directly comparable without additional cleaning.
+
+Another challenge is that country-related analysis can be more complex than simple counting because the place of birth and the affiliation or award-related country may not always be stored in exactly the same format or level of detail. Some records may also have missing or incomplete location information.
+
+In addition, because one of the questions compares country-related fields, careful filtering and interpretation will be required to avoid overstating results when data is incomplete or ambiguous.
+
+------------------------------------------------------------------------
+
+## Expected Outcome
+
+The expected outcome is a reproducible Quarto report that demonstrates the full workflow of retrieving Nobel Prize JSON data from an API, transforming that data into tidy data frames, and answering four clearly stated data-driven questions.
+
+The report will show not only that JSON data can be successfully parsed and analyzed in R, but also that the Nobel Prize dataset can be used for more meaningful exploratory analysis beyond simple counts. Visualizations such as bar charts or time-based plots will be used where appropriate to support interpretation.
+
+Overall, this assignment will demonstrate JSON handling, tidy data transformation, exploratory analysis, and clear presentation of results in a single self-contained document.
