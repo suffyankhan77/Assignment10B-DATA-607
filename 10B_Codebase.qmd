@@ -1,0 +1,544 @@
+---
+title: "Assignment 10B – Codebase"
+author: "Muhammad Suffyan Khan"
+format: html
+editor: visual
+date: "04/19/2026"
+---
+
+## Objective
+
+The objective of this assignment is to use the public Nobel Prize API data provided by NobelPrize.org in JSON format, retrieve the data in R, transform the nested JSON into tidy data frames, and answer four interesting data-driven questions based on the Nobel Prize dataset.
+
+This assignment will demonstrate the ability to work with JSON data from an API, flatten and tidy nested structures, and perform exploratory analysis using tidyverse tools in R. In addition to answering straightforward summary questions, at least one of the questions will go beyond simple counts by requiring filtering, comparison, and field-level analysis across laureate and prize information.
+
+The final result will be a single reproducible Quarto document that includes the four questions, all code used to retrieve and process the JSON data, and the resulting answers in the form of tables, summaries, and visualizations.
+
+------------------------------------------------------------------------
+
+## Selected Data Source
+
+For this assignment, I will use the official **Nobel Prize API** made available through the Nobel Prize Developer Zone.
+
+The two main API endpoints that will be used where appropriate are:
+
+-   `https://api.nobelprize.org/2.1/nobelPrizes`
+-   `https://api.nobelprize.org/2.1/laureates`
+
+These endpoints return Nobel Prize data in JSON format, including information about prize categories, award years, laureates, birth information, affiliations, and award motivations.
+
+API Documentation: https://www.nobelprize.org/about/developer-zone-2/
+
+Since this assignment requires JSON processing in R, the analysis will directly retrieve the API responses in JSON format rather than relying on manually downloaded files. This supports reproducibility because the data retrieval and transformation steps will be included directly in the Quarto document.
+
+------------------------------------------------------------------------
+
+## Planned Questions
+
+The following four questions will guide the analysis:
+
+### Question 1
+
+**Which Nobel Prize categories have been awarded most frequently?**
+
+This question will provide a category-level summary of Nobel Prize awards and serve as an introductory overview of the dataset.
+
+### Question 2
+
+**Which decades have had the highest number of Nobel Prize awards or laureates?**
+
+This question will examine how Nobel Prize activity has varied over time by grouping awards into decades.
+
+### Question 3
+
+**Which birth countries have produced the highest number of Nobel laureates?**
+
+This question will use laureate-level information to identify which countries are most frequently represented as places of birth among Nobel laureates.
+
+### Question 4
+
+**Which countries appear to lose the most Nobel laureates, meaning laureates born in one country but affiliated with or awarded through another country?**
+
+This question goes beyond simple counts and will require comparing multiple country-related fields from the laureate data. It is intended to satisfy the assignment requirement that at least one question involve more than a basic frequency count by using filtering and cross-field comparison.
+
+------------------------------------------------------------------------
+
+## Planned Workflow
+
+The workflow for this assignment will be:
+
+1.  Load required libraries such as `httr2` or `jsonlite`, along with tidyverse packages including `dplyr`, `tidyr`, `purrr`, `stringr`, and `ggplot2`
+2.  Retrieve JSON data from one or both Nobel Prize API endpoints
+3.  Parse the JSON responses into R lists
+4.  Inspect the JSON structure to identify the main nested fields relevant to prizes, laureates, years, categories, countries, and affiliations
+5.  Extract and flatten the nested components into tidy tibbles
+6.  Standardize column names and retain only the variables needed for analysis
+7.  Convert year fields to numeric values where needed and derive additional variables such as decade
+8.  Clean country-related fields so they can be grouped and compared consistently
+9.  Create separate tidy data frames if necessary for:
+    -   prize-level data
+    -   laureate-level data
+    -   affiliation or award-related country data
+10. Join or compare data frames where needed to answer the more analytical question(s)
+11. Produce tables, summaries, and visualizations for each of the four questions
+12. Include short interpretations of each result directly in the Quarto report
+
+------------------------------------------------------------------------
+
+## Planned Data Preparation
+
+Because the Nobel Prize API returns nested JSON, one of the main preparation tasks will be converting hierarchical API output into tidy rectangular data frames.
+
+Several data preparation steps are expected:
+
+-   Nested laureate and prize information may need to be unnested into separate rows
+-   Country information may appear in different fields and may require extraction from nested objects
+-   Some laureates or prizes may have missing metadata, such as absent birth locations, affiliations, or organization-related fields
+-   Category and year fields may need to be standardized for consistent grouping and plotting
+-   In some cases, institutions and individuals may appear differently in the raw data, so only relevant fields will be retained depending on the question being answered
+
+To keep the analysis tidy and interpretable, only variables directly relevant to the four questions will be preserved in the final analytical tables.
+
+------------------------------------------------------------------------
+
+## Validation and Quality Checks
+
+To strengthen the reliability of the analysis, I will include basic validation checks during data preparation.
+
+These checks may include:
+
+-   verifying that the API request returns data successfully
+-   checking the structure of the parsed JSON objects
+-   confirming that key columns such as year, category, and laureate identifiers are present after transformation
+-   inspecting missing values in important fields such as birth country or affiliation country
+-   checking row counts before and after unnesting to ensure the transformation behaves as expected
+-   reviewing distinct category names and year ranges for consistency
+
+These checks will help ensure that the tidy data frames accurately reflect the original JSON data and that the final answers are based on valid transformations.
+
+------------------------------------------------------------------------
+
+## Anticipated Challenges
+
+One expected challenge is that the Nobel Prize API data is nested and may represent people, organizations, prizes, and affiliations in slightly different ways. This means some fields may not be directly comparable without additional cleaning.
+
+Another challenge is that country-related analysis can be more complex than simple counting because the place of birth and the affiliation or award-related country may not always be stored in exactly the same format or level of detail. Some records may also have missing or incomplete location information.
+
+In addition, because one of the questions compares country-related fields, careful filtering and interpretation will be required to avoid overstating results when data is incomplete or ambiguous.
+
+------------------------------------------------------------------------
+
+## Expected Outcome
+
+The expected outcome is a reproducible Quarto report that demonstrates the full workflow of retrieving Nobel Prize JSON data from an API, transforming that data into tidy data frames, and answering four clearly stated data-driven questions.
+
+The report will show not only that JSON data can be successfully parsed and analyzed in R, but also that the Nobel Prize dataset can be used for more meaningful exploratory analysis beyond simple counts. Visualizations such as bar charts or time-based plots will be used where appropriate to support interpretation.
+
+Overall, this assignment will demonstrate JSON handling, tidy data transformation, exploratory analysis, and clear presentation of results in a single self-contained document.
+
+
+# Codebase
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+### Load Libraries
+
+```{r}
+library(httr2)
+library(tidyverse)
+library(jsonlite)
+library(knitr)
+```
+
+These libraries are used for API requests, JSON handling, data wrangling, tables, and visualizations.
+
+---
+
+### Retrieve Complete Data from the Nobel Prize API
+
+The Nobel Prize API is paginated, so all pages must be collected to analyze the full dataset rather than only the first 25 records.
+
+```{r}
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0) y else x
+}
+
+get_en_value <- function(x) {
+  if (is.null(x) || length(x) == 0) return(NA_character_)
+  
+  if (is.character(x)) {
+    return(x[[1]])
+  }
+  
+  if (is.list(x) && !is.null(x$en)) {
+    return(as.character(x$en[[1]]))
+  }
+  
+  NA_character_
+}
+
+fetch_all_pages <- function(base_url, results_key) {
+  all_results <- list()
+  next_url <- base_url
+  
+  while (!is.null(next_url)) {
+    page <- request(next_url) |>
+      req_perform() |>
+      resp_body_json(simplifyVector = FALSE)
+    
+    all_results <- c(all_results, page[[results_key]])
+    next_url <- page$links[["next"]] %||% NULL
+  }
+  
+  all_results
+}
+
+prizes_raw <- fetch_all_pages(
+  "https://api.nobelprize.org/2.1/nobelPrizes",
+  "nobelPrizes"
+)
+
+laureates_raw <- fetch_all_pages(
+  "https://api.nobelprize.org/2.1/laureates",
+  "laureates"
+)
+```
+
+This step retrieves the full Nobel Prize and laureate data from the API.
+
+---
+
+### Build Tidy Data Frames
+
+#### Prize-Level Data
+
+This table keeps one row per prize award and is used for category and decade summaries.
+
+```{r}
+prizes_tbl <- map_dfr(prizes_raw, function(prize) {
+  tibble(
+    award_year = as.integer(prize$awardYear %||% NA_character_),
+    category = get_en_value(prize$category),
+    category_full = get_en_value(prize$categoryFullName)
+  )
+}) %>%
+  distinct() %>%
+  mutate(decade = floor(award_year / 10) * 10)
+
+glimpse(prizes_tbl)
+```
+
+#### Laureate-Level Data
+
+This table keeps one row per laureate and stores core birth-country information.
+
+```{r}
+laureates_tbl <- map_dfr(laureates_raw, function(laureate) {
+  tibble(
+    laureate_id = as.character(laureate$id %||% NA_character_),
+    laureate_name = coalesce(
+      get_en_value(laureate$knownName),
+      get_en_value(laureate$fullName),
+      get_en_value(laureate$orgName)
+    ),
+    gender = laureate$gender %||% NA_character_,
+    birth_country = get_en_value(laureate$birth$place$country),
+    birth_country_now = get_en_value(laureate$birth$place$countryNow)
+  )
+})
+
+glimpse(laureates_tbl)
+```
+
+#### Laureate–Prize Data
+
+This table expands the nested `nobelPrizes` field so each laureate-prize combination becomes a row.
+
+```{r}
+laureate_prizes_tbl <- map_dfr(laureates_raw, function(laureate) {
+  laureate_id <- as.character(laureate$id %||% NA_character_)
+  laureate_name <- coalesce(
+    get_en_value(laureate$knownName),
+    get_en_value(laureate$fullName),
+    get_en_value(laureate$orgName)
+  )
+  birth_country <- get_en_value(laureate$birth$place$country)
+  birth_country_now <- get_en_value(laureate$birth$place$countryNow)
+  
+  prizes <- laureate$nobelPrizes
+  
+  if (is.null(prizes) || length(prizes) == 0) {
+    return(tibble())
+  }
+  
+  map_dfr(prizes, function(prize) {
+    tibble(
+      laureate_id = laureate_id,
+      laureate_name = laureate_name,
+      birth_country = birth_country,
+      birth_country_now = birth_country_now,
+      award_year = as.integer(prize$awardYear %||% NA_character_),
+      category = get_en_value(prize$category),
+      motivation = get_en_value(prize$motivation)
+    )
+  })
+}) %>%
+  mutate(decade = floor(award_year / 10) * 10)
+
+glimpse(laureate_prizes_tbl)
+```
+
+#### Laureate–Prize–Affiliation Data
+
+This table extracts affiliation countries from each laureate’s prize record. It is used for the advanced comparison question.
+
+```{r}
+affiliations_tbl <- map_dfr(laureates_raw, function(laureate) {
+  laureate_id <- as.character(laureate$id %||% NA_character_)
+  laureate_name <- coalesce(
+    get_en_value(laureate$knownName),
+    get_en_value(laureate$fullName),
+    get_en_value(laureate$orgName)
+  )
+  birth_country <- get_en_value(laureate$birth$place$country)
+  birth_country_now <- get_en_value(laureate$birth$place$countryNow)
+  
+  prizes <- laureate$nobelPrizes
+  
+  if (is.null(prizes) || length(prizes) == 0) {
+    return(tibble())
+  }
+  
+  map_dfr(prizes, function(prize) {
+    affiliations <- prize$affiliations
+    
+    if (is.null(affiliations) || length(affiliations) == 0) {
+      return(tibble(
+        laureate_id = laureate_id,
+        laureate_name = laureate_name,
+        birth_country = birth_country,
+        birth_country_now = birth_country_now,
+        award_year = as.integer(prize$awardYear %||% NA_character_),
+        category = get_en_value(prize$category),
+        affiliation_country = NA_character_
+      ))
+    }
+    
+    map_dfr(affiliations, function(aff) {
+      tibble(
+        laureate_id = laureate_id,
+        laureate_name = laureate_name,
+        birth_country = birth_country,
+        birth_country_now = birth_country_now,
+        award_year = as.integer(prize$awardYear %||% NA_character_),
+        category = get_en_value(prize$category),
+        affiliation_country = coalesce(
+          get_en_value(aff$countryNow),
+          get_en_value(aff$country)
+        )
+      )
+    })
+  })
+}) %>%
+  mutate(decade = floor(award_year / 10) * 10)
+
+glimpse(affiliations_tbl)
+```
+
+---
+
+### Validation Checks
+
+These checks confirm that the full dataset was retrieved and that the most important fields were created correctly.
+
+```{r}
+tibble(
+  dataset = c("prizes_tbl", "laureates_tbl", "laureate_prizes_tbl", "affiliations_tbl"),
+  rows = c(nrow(prizes_tbl), nrow(laureates_tbl), nrow(laureate_prizes_tbl), nrow(affiliations_tbl))
+) %>%
+  kable(caption = "Row counts for the main tidy tables")
+```
+
+```{r}
+tibble(
+  min_award_year = min(prizes_tbl$award_year, na.rm = TRUE),
+  max_award_year = max(prizes_tbl$award_year, na.rm = TRUE),
+  distinct_categories = n_distinct(prizes_tbl$category),
+  missing_birth_country = sum(is.na(laureates_tbl$birth_country_now)),
+  missing_affiliation_country = sum(is.na(affiliations_tbl$affiliation_country))
+) %>%
+  kable(caption = "Basic validation checks")
+```
+
+---
+
+## Question 1: Which Nobel Prize Categories Have Been Awarded Most Frequently?
+
+This question provides a simple overview of how often each category has appeared in the Nobel Prize dataset.
+
+```{r}
+q1_category_counts <- prizes_tbl %>%
+  count(category, sort = TRUE)
+
+q1_category_counts %>%
+  kable(caption = "Nobel Prize categories ranked by number of awards")
+```
+
+### Visualization
+
+```{r}
+q1_category_counts %>%
+  ggplot(aes(x = reorder(category, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Nobel Prize Categories by Number of Awards",
+    x = "Category",
+    y = "Number of Awards"
+  )
+```
+
+### Brief Interpretation
+
+The results show that Chemistry, Literature, Peace, Physics, and Physiology or Medicine each have 125 awards, reflecting their long-standing presence since the early years of the Nobel Prize. Economic Sciences has a much lower count of 57 because it was introduced later than the original Nobel categories.
+
+---
+
+## Question 2: Which Decades Have Had the Highest Number of Nobel Prize Awards?
+
+This question examines how Nobel Prize activity changes over time by grouping awards into decades.
+
+```{r}
+q2_decade_counts <- prizes_tbl %>%
+  filter(!is.na(decade)) %>%
+  count(decade, sort = TRUE)
+
+q2_decade_counts %>%
+  kable(caption = "Number of Nobel Prize awards by decade")
+```
+
+### Visualization
+
+```{r}
+q2_decade_counts %>%
+  ggplot(aes(x = decade, y = n)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Nobel Prize Awards by Decade",
+    x = "Decade",
+    y = "Number of Awards"
+  )
+```
+
+### Brief Interpretation
+
+The decade counts are highest in the 1970s, 1980s, 1990s, 2000s, and 2010s, each with 60 awards, showing a stable modern pattern of Nobel Prize activity across six categories. Earlier decades have slightly lower totals, and the 2020s are currently lower because the decade is still in progress.
+
+---
+
+## Question 3: Which Birth Countries Have Produced the Highest Number of Nobel Laureates?
+
+This question uses laureate-level birthplace information to identify which countries are most represented among Nobel laureates.
+
+```{r}
+q3_birth_country_counts <- laureates_tbl %>%
+  filter(!is.na(birth_country_now)) %>%
+  count(birth_country_now, sort = TRUE)
+
+q3_birth_country_counts %>%
+  slice_head(n = 15) %>%
+  kable(caption = "Top 15 present-day birth countries of Nobel laureates")
+```
+
+### Visualization
+
+```{r}
+q3_birth_country_counts %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(birth_country_now, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 15 Present-Day Birth Countries of Nobel Laureates",
+    x = "Birth Country (Present-Day)",
+    y = "Number of Laureates"
+  )
+```
+
+### Brief Interpretation
+
+The United States stands far above all other countries with 296 laureates, followed by the United Kingdom and Germany. This suggests that Nobel laureates are heavily concentrated in a small number of countries, especially the United States, which dominates the present-day birth-country distribution in this dataset.
+
+---
+
+## Question 4: Which Countries Appear to Lose the Most Nobel Laureates?
+
+To make this question analytical rather than a simple count, this section compares each laureate’s **present-day birth country** with the **country of award-time affiliation** recorded in the prize data. Cases where the two do not match are treated as cross-country movement.
+
+```{r}
+q4_country_loss <- affiliations_tbl %>%
+  filter(
+    !is.na(birth_country_now),
+    !is.na(affiliation_country),
+    birth_country_now != affiliation_country
+  ) %>%
+  distinct(laureate_id, award_year, category, birth_country_now, affiliation_country) %>%
+  count(birth_country_now, sort = TRUE)
+
+q4_country_loss %>%
+  slice_head(n = 15) %>%
+  kable(caption = "Top 15 birth countries whose laureates were awarded with affiliations in another country")
+```
+
+### Visualization
+
+```{r}
+q4_country_loss %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(birth_country_now, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Countries Losing Laureates to Another Affiliation Country",
+    x = "Birth Country (Present-Day)",
+    y = "Cross-Country Laureate Count"
+  )
+```
+
+### Additional Comparison Table
+
+This table shows the most common country-to-country flows.
+
+```{r}
+q4_flows <- affiliations_tbl %>%
+  filter(
+    !is.na(birth_country_now),
+    !is.na(affiliation_country),
+    birth_country_now != affiliation_country
+  ) %>%
+  distinct(laureate_id, award_year, category, birth_country_now, affiliation_country) %>%
+  count(birth_country_now, affiliation_country, sort = TRUE)
+
+q4_flows %>%
+  slice_head(n = 15) %>%
+  kable(caption = "Most common cross-country laureate flows")
+```
+
+### Brief Interpretation
+
+Germany, the United Kingdom, and Poland appear most often in the cross-country counts, meaning many laureates born there were affiliated with institutions in another country at the time of the award. The flow table shows that the United States is the most common destination, which suggests that it has been a major attractor of Nobel-level researchers and scholars.
+
+---
+
+## Conclusion
+
+The Nobel Prize API data was successfully retrieved in full, transformed into tidy data frames, and used to answer four data-driven questions. The analysis shows category-level patterns, long-term trends across decades, country-level birthplace representation, and cross-country affiliation patterns among Nobel laureates.
+
+Overall, this codebase demonstrates complete JSON retrieval, nested data handling, tidy transformation, and comparative analysis in a reproducible Quarto workflow.
+
+
+
+
