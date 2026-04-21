@@ -194,5 +194,3 @@ Full transcript available in:
 * R Packages: tidyverse, httr2, jsonlite
 ```
 
-
-But this version = **academic A+ + clean GitHub** 🚀
